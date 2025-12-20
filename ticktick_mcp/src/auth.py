@@ -8,15 +8,15 @@ without manually copying and pasting tokens.
 
 import os
 import webbrowser
-import json
 import time
 import base64
 import http.server
 import socketserver
 import urllib.parse
 import requests
+import socket
 from pathlib import Path
-from typing import Dict, Optional, Tuple, Any
+from typing import Any
 from dotenv import load_dotenv
 import logging
 
@@ -133,16 +133,15 @@ class TickTickAuth:
     """TickTick OAuth authentication manager."""
     
     def __init__(self, client_id: str = None, client_secret: str = None, 
-                 redirect_uri: str = "http://localhost:8000/callback",
-                 port: int = 8000, env_file: str = None):
+                 redirect_uri: str = None, port: int = 8000, env_file: str = None):
         """
         Initialize the TickTick authentication manager.
         
         Args:
             client_id: The TickTick client ID
             client_secret: The TickTick client secret
-            redirect_uri: The redirect URI for OAuth callbacks
-            port: The port to use for the callback server
+            redirect_uri: The redirect URI for OAuth callbacks (auto-generated if None)
+            port: The port to use for the callback server (will find alternative if busy)
             env_file: Path to .env file with credentials
         """
         # Try to load from environment variables or .env file
@@ -155,8 +154,16 @@ class TickTickAuth:
         self.token_url = os.getenv("TICKTICK_TOKEN_URL") or "https://ticktick.com/oauth/token"
         self.client_id = client_id or os.getenv("TICKTICK_CLIENT_ID")
         self.client_secret = client_secret or os.getenv("TICKTICK_CLIENT_SECRET")
-        self.redirect_uri = redirect_uri
-        self.port = port
+        
+        # Find an available port if the specified port is busy
+        self.port = self._find_available_port(port)
+        
+        # Generate redirect URI if not provided
+        if redirect_uri:
+            self.redirect_uri = redirect_uri
+        else:
+            self.redirect_uri = f"http://localhost:{self.port}/callback"
+            
         self.auth_code = None
         self.tokens = None
         
@@ -213,8 +220,8 @@ class TickTickAuth:
         # Get the authorization URL
         auth_url = self.get_authorization_url(scopes, state)
         
-        print(f"Opening browser for TickTick authorization...")
-        print(f"If the browser doesn't open automatically, please visit this URL:")
+        print("Opening browser for TickTick authorization...")
+        print("If the browser doesn't open automatically, please visit this URL:")
         print(auth_url)
         
         # Open the browser for the user to authorize
@@ -306,7 +313,7 @@ class TickTickAuth:
                 try:
                     error_details = e.response.json()
                     return f"Error exchanging code for token: {error_details}"
-                except:
+                except Exception:
                     return f"Error exchanging code for token: {e.response.text}"
             return f"Error exchanging code for token: {str(e)}"
     
@@ -345,6 +352,47 @@ class TickTickAuth:
         
         logger.info("Tokens saved to .env file")
 
+    def _find_available_port(self, preferred_port: int) -> int:
+        """
+        Find an available port, starting with the preferred port.
+        
+        Args:
+            preferred_port: The preferred port to start with
+            
+        Returns:
+            An available port number
+        """
+        # Try ports in range starting from preferred port
+        for port in range(preferred_port, preferred_port + 11):
+            if self._is_port_available(port):
+                if port != preferred_port:
+                    logger.info(f"Port {preferred_port} is busy, using port {port} instead")
+                return port
+        
+        # As a last resort, let the OS choose a random port
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(('', 0))
+            port = s.getsockname()[1]
+            logger.info(f"Port {preferred_port} is busy, using randomly assigned port {port}")
+            return port
+    
+    def _is_port_available(self, port: int) -> bool:
+        """
+        Check if a port is available.
+        
+        Args:
+            port: The port to check
+            
+        Returns:
+            True if the port is available, False otherwise
+        """
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('', port))
+                return True
+        except OSError:
+            return False
+
 def setup_auth_cli():
     """Run the authentication flow as a CLI utility."""
     import argparse
@@ -352,10 +400,9 @@ def setup_auth_cli():
     parser = argparse.ArgumentParser(description='TickTick OAuth Authentication')
     parser.add_argument('--client-id', help='TickTick client ID')
     parser.add_argument('--client-secret', help='TickTick client secret')
-    parser.add_argument('--redirect-uri', default='http://localhost:8000/callback',
-                        help='OAuth redirect URI')
+    parser.add_argument('--redirect-uri', help='OAuth redirect URI (auto-generated if not provided)')
     parser.add_argument('--port', type=int, default=8000,
-                        help='Port to use for OAuth callback server')
+                        help='Preferred port for OAuth callback server (alternative port will be used if busy)')
     parser.add_argument('--env-file', help='Path to .env file with credentials')
     
     args = parser.parse_args()

@@ -67,7 +67,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for Ti
 This server uses OAuth2 to authenticate with TickTick. The setup process is straightforward:
 
 1. Register your application at the [TickTick Developer Center](https://developer.ticktick.com/manage)
-   - Set the redirect URI to `http://localhost:8000/callback`
+   - Set the redirect URI to `http://localhost:8000/callback` (the server will automatically use an alternative port if 8000 is busy)
    - Note your Client ID and Client Secret
 
 2. Run the authentication command:
@@ -88,7 +88,7 @@ The server handles token refresh automatically, so you won't need to reauthentic
 [滴答清单 - Dida365](https://dida365.com/home) is China version of TickTick, and the authentication process is similar to TickTick. Follow these steps to set up Dida365 authentication:
 
 1. Register your application at the [Dida365 Developer Center](https://developer.dida365.com/manage)
-   - Set the redirect URI to `http://localhost:8000/callback`
+   - Set the redirect URI to `http://localhost:8000/callback` (the server will automatically use an alternative port if 8000 is busy)
    - Note your Client ID and Client Secret
 
 2. Add environment variables to your `.env` file:
