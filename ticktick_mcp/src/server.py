@@ -1,9 +1,7 @@
-import asyncio
-import json
 import os
 import logging
-from datetime import datetime, timezone
-from typing import Dict, List, Any, Optional
+from datetime import datetime
+from typing import Dict, List
 
 from mcp.server.fastmcp import FastMCP
 from dotenv import load_dotenv
@@ -113,8 +111,32 @@ def format_project(project: Dict) -> str:
 # MCP Tools
 
 @mcp.tool()
+async def get_inbox_tasks() -> str:
+    """Get tasks from the "Inbox" list."""
+    if not ticktick:
+        if not initialize_client():
+            return "Failed to initialize TickTick client. Please check your API credentials."
+
+    try:
+        result = ticktick.get_project_tasks("inbox")
+        if 'error' in result:
+            return f"Error fetching inbox tasks: {result['error']}"
+        
+        if not result:
+            return "No tasks found in inbox."
+        
+        formatted_tasks = [format_task(task) for task in result]
+        return f"Found {len(result)} tasks in inbox:\n\n" + "\n---\n".join(formatted_tasks)
+        
+    except Exception as e:
+        logger.error(f"Error in get_inbox_tasks: {e}")
+        return f"Error retrieving inbox tasks: {str(e)}"
+
+@mcp.tool()
 async def get_projects() -> str:
-    """Get all projects from TickTick."""
+    """Get all projects from TickTick.
+    Attention: this does not include the "inbox" project. Please call get_inbox_tasks separately.
+    """
     if not ticktick:
         if not initialize_client():
             return "Failed to initialize TickTick client. Please check your API credentials."
