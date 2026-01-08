@@ -118,15 +118,16 @@ async def get_inbox_tasks() -> str:
             return "Failed to initialize TickTick client. Please check your API credentials."
 
     try:
-        result = ticktick.get_project_tasks("inbox")
-        if 'error' in result:
-            return f"Error fetching inbox tasks: {result['error']}"
+        project_data = ticktick.get_project_with_data("inbox")
+        if 'error' in project_data:
+            return f"Error fetching inbox tasks: {project_data['error']}"
         
-        if not result:
+        tasks = project_data.get('tasks', [])
+        if not tasks:
             return "No tasks found in inbox."
         
-        formatted_tasks = [format_task(task) for task in result]
-        return f"Found {len(result)} tasks in inbox:\n\n" + "\n---\n".join(formatted_tasks)
+        formatted_tasks = [format_task(task) for task in tasks]
+        return f"Found {len(tasks)} tasks in inbox:\n\n" + "\n---\n".join(formatted_tasks)
         
     except Exception as e:
         logger.error(f"Error in get_inbox_tasks: {e}")
